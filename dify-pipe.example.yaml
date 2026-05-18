@@ -1,0 +1,67 @@
+# dify-dsl-pipe 配置文件示例
+# 复制为 dify-pipe.yaml 并修改
+
+# Dify 实例列表
+instances:
+  - name: prod
+    url: "https://dify.example.com/console/api"
+    # 认证方式 1: Access Token（推荐）
+    token: "your-access-token"
+    # 认证方式 2: 邮箱 + 密码
+    # email: "admin@example.com"
+    # password: "your-password"
+    # 可选: 该实例下的 Workspace 列表
+    # workspaces:
+    #   - id: "ws-abc123"
+    #     name: "团队A"
+
+  - name: staging
+    url: "https://dify-staging.example.com/console/api"
+    token: "staging-token"
+
+# Profile: 绑定实例 + 存储 + 导出选项
+profiles:
+  prod:
+    instance: prod
+    storage:
+      type: local
+      path: "./dify-backup/prod"
+    export:
+      pattern: "by-type"
+      includeVersionHistory: true
+
+  prod-s3:
+    instance: prod
+    storage:
+      type: s3
+      bucket: "my-dify-backups"
+      region: "us-east-1"
+      # 阿里云 OSS: endpoint: "oss-cn-hangzhou.aliyuncs.com"
+      # 腾讯云 COS: endpoint: "cos.ap-guangzhou.myqcloud.com"
+      # MinIO:      endpoint: "http://minio.local:9000", forcePathStyle: true
+      accessKeyId: "YOUR_ACCESS_KEY"
+      secretAccessKey: "YOUR_SECRET_KEY"
+
+  prod-git:
+    instance: prod
+    storage:
+      type: git
+      repo: "/path/to/backup-repo"
+      branch: "main"
+      push: true
+
+# 默认选项（可被 profile 或 CLI 参数覆盖）
+defaults:
+  export:
+    includeSecret: false
+    includeVersionHistory: true
+    incremental: false
+    pattern: "by-type"
+  import:
+    onConflict: "skip"
+    dryRun: false
+  # notification:
+  #   enabled: true
+  #   webhookUrl: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx"
+  #   onFailure: true
+  #   onSuccess: false
