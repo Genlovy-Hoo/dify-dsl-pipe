@@ -1,6 +1,7 @@
 node_modules/
 dist/
 skill-workspace/
+dify-backup/
 *.tgz
 .DS_Store
 config.yaml

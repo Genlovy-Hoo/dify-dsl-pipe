@@ -34,7 +34,7 @@ export class S3Storage implements StorageBackend {
         accessKeyId: config.accessKeyId,
         secretAccessKey: config.secretAccessKey,
       },
-      forcePathStyle: config.forcePathStyle ?? !!config.endpoint,
+      forcePathStyle: config.forcePathStyle ?? false,
     });
   }
 
