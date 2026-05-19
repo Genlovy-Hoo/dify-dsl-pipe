@@ -3,11 +3,14 @@
 </p>
 
 <p align="center">
-  <a href="README_EN.md"><img src="https://img.shields.io/badge/English-README-blue" alt="English"></a>
   <a href="https://www.npmjs.com/package/dify-dsl-pipe"><img src="https://img.shields.io/npm/v/dify-dsl-pipe" alt="npm version"></a>
-  <a href="https://www.npmjs.com/package/dify-dsl-pipe"><img src="https://img.shields.io/npm/dm/dify-dsl-pipe" alt="npm downloads"></a>
+  <a href="https://www.npmjs.com/package/dify-dsl-pipe"><img src="https://img.shields.io/npm/dt/dify-dsl-pipe" alt="npm downloads"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green" alt="License"></a>
   <img src="https://img.shields.io/badge/node-%3E%3D18-brightgreen" alt="Node.js">
+</p>
+
+<p align="center">
+  <a href="README_EN.md">English</a> | 中文
 </p>
 
 Dify 应用 DSL 的一站式管道工具，涵盖导出、导入、备份、迁移、定时服务与 MCP Server 集成。

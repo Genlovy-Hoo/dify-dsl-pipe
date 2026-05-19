@@ -3,11 +3,14 @@
 </p>
 
 <p align="center">
-  <a href="README.md"><img src="https://img.shields.io/badge/中文-README-red" alt="中文"></a>
   <a href="https://www.npmjs.com/package/dify-dsl-pipe"><img src="https://img.shields.io/npm/v/dify-dsl-pipe" alt="npm version"></a>
-  <a href="https://www.npmjs.com/package/dify-dsl-pipe"><img src="https://img.shields.io/npm/dm/dify-dsl-pipe" alt="npm downloads"></a>
+  <a href="https://www.npmjs.com/package/dify-dsl-pipe"><img src="https://img.shields.io/npm/dt/dify-dsl-pipe" alt="npm downloads"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green" alt="License"></a>
   <img src="https://img.shields.io/badge/node-%3E%3D18-brightgreen" alt="Node.js">
+</p>
+
+<p align="center">
+  English | <a href="README.md">中文</a>
 </p>
 
 An all-in-one pipeline tool for Dify application DSL — covering export, import, backup, migration, scheduled service, and MCP Server integration.
