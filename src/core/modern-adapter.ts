@@ -1,18 +1,24 @@
+import semver from "semver";
 import type { DifyAdapter, AdapterConfig } from "./adapter.js";
 import type { DifyApp, DifyWorkspace, WorkflowVersion } from "./types.js";
 import { HttpClient } from "./http.js";
+
+// Dify ≥ 1.11.2 expects Base64-encoded password (PR #29659, merged 2025-12-16)
+const PASSWORD_BASE64_MIN = "1.11.2";
 
 export class ModernAdapter implements DifyAdapter {
   private http: HttpClient;
   private email?: string;
   private password?: string;
   private token?: string;
+  private version?: string;
 
   constructor(config: AdapterConfig) {
     this.http = new HttpClient(config.baseUrl, config.timeout, config.maxRetries);
     this.email = config.email;
     this.password = config.password;
     this.token = config.token;
+    this.version = config.version;
   }
 
   async login(): Promise<void> {
@@ -24,10 +30,36 @@ export class ModernAdapter implements DifyAdapter {
       throw new Error("Modern adapter: 需要 token 或 email+password");
     }
 
-    const encodedPassword = Buffer.from(this.password).toString("base64");
+    const { email, password } = this;
+    const clean = semver.coerce(this.version ?? "1.0.0")?.version ?? "1.0.0";
+    const b64 = Buffer.from(password).toString("base64");
+
+    // 版本探测可能不准（/setup 无 x-version header 时 fallback 到 1.0.0），
+    // 按版本给出首选编码顺序，401 时自动换另一种重试一次
+    const attempts = semver.gte(clean, PASSWORD_BASE64_MIN)
+      ? [b64, password]   // ≥ 1.11.2: 优先 Base64
+      : [password, b64];  // < 1.11.2: 优先明文
+
+    let lastError: Error | undefined;
+    for (const pw of attempts) {
+      try {
+        await this.doLogin(email, pw);
+        return;
+      } catch (e) {
+        if (e instanceof Error && e.message.includes("401")) {
+          lastError = e;
+        } else {
+          throw e;
+        }
+      }
+    }
+    throw lastError ?? new Error("登录失败：email 或密码错误");
+  }
+
+  private async doLogin(email: string, password: string): Promise<void> {
     const res = await this.http.post("/login", {
-      email: this.email,
-      password: encodedPassword,
+      email,
+      password,
       remember_me: false,
     });
 

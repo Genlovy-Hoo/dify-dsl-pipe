@@ -18,4 +18,5 @@ export interface AdapterConfig {
   token?: string;
   timeout: number;
   maxRetries: number;
+  version?: string;
 }

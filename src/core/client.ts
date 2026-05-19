@@ -78,9 +78,10 @@ export class DifyClient {
   }
 
   private createAdapter(type: "legacy" | "modern"): DifyAdapter {
+    const config = { ...this.config, version: this.instanceInfo.version };
     return type === "legacy"
-      ? new LegacyAdapter(this.config)
-      : new ModernAdapter(this.config);
+      ? new LegacyAdapter(config)
+      : new ModernAdapter(config);
   }
 
   async getAllApps(filter?: AppFilter): Promise<DifyApp[]> {
