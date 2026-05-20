@@ -3,7 +3,7 @@ import type { DifyClient } from "./client.js";
 import type { DifyApp, AppFilter, ExportResult, ExportedApp, PipeState } from "./types.js";
 import type { StorageBackend } from "../storage/interface.js";
 import type { ExportOptions } from "../config/types.js";
-import { buildFilePath, sanitize } from "../utils/naming.js";
+import { buildFilePath, sanitize, resolvePattern } from "../utils/naming.js";
 import { log, formatDuration, formatSize } from "../utils/logger.js";
 
 export async function exportApps(
@@ -125,7 +125,8 @@ async function exportSingleApp(
             : undefined;
           // 有名字用版本名，未命名用 app 名+时间戳
           const versionLabel = ver.marked_name ?? sanitize(app.name);
-          const versionPattern = opts.pattern.replace(".yml", `_versions/${versionLabel}_{date}.yml`);
+          const resolvedPatternStr = resolvePattern(opts.pattern);
+          const versionPattern = resolvedPatternStr.replace(".yml", `_versions/${versionLabel}_{date}.yml`);
           const verPath = buildFilePath(versionPattern, {
             ...ctx,
             date: verDate,

@@ -35,6 +35,7 @@ export function registerExportCommand(program: Command) {
     .option("--incremental", "增量导出（只导出有更新的应用）")
     .option("--archive <format>", "打包格式: none, zip", "none")
     .option("--workspace <id>", "指定 Workspace ID")
+    .option("--all-workspaces", "导出所有 Workspace（自动遍历）")
     .option("--json", "JSON 格式输出")
     .option("--verbose", "详细日志")
     .action(async (opts) => {
@@ -61,12 +62,6 @@ export function registerExportCommand(program: Command) {
         const info = await client.connect();
         log.success(`已连接 Dify ${info.version} (${info.adapterType} adapter)`);
 
-        // 切换 Workspace
-        if (opts.workspace ?? resolved.workspace) {
-          await client.switchWorkspace(opts.workspace ?? resolved.workspace!);
-          log.info(`已切换到 Workspace: ${opts.workspace ?? resolved.workspace}`);
-        }
-
         // 创建存储
         const storage = createStorage(storageConfig);
         if (!(await storage.testConnection())) {
@@ -74,43 +69,76 @@ export function registerExportCommand(program: Command) {
           process.exit(1);
         }
 
-        // 解析过滤条件
         const filter = parseFilter(opts.filter);
-
-        // 执行导出
-        const result = await exportApps(client, storage, {
+        const baseExportOpts = {
           includeSecret: opts.includeSecret ?? false,
           includeVersionHistory: opts.includeVersions ?? true,
           incremental: opts.incremental,
           archive: opts.archive,
-          pattern: opts.pattern,
           filter,
           instanceName: resolved.instance.name,
-          workspaceName: opts.workspace ?? resolved.workspace,
-        });
+        };
+
+        let totalSuccess = 0;
+        let totalFailed = 0;
+        let totalDuration = 0;
+        let hasError = false;
+
+        if (opts.allWorkspaces) {
+          // --all-workspaces：遍历所有 workspace 逐一导出
+          // 未显式指定 pattern 时从 by-type 升级为 by-workspace，目录自动按 workspace 分组
+          const pattern = opts.pattern !== "by-type" ? opts.pattern : "by-workspace";
+          const workspaces = await client.getWorkspaces();
+          log.info(`找到 ${workspaces.length} 个 Workspace`);
+
+          for (const ws of workspaces) {
+            log.info(`\nWorkspace: ${pc.bold(ws.name)}`);
+            await client.switchWorkspace(ws.id);
+            const result = await exportApps(client, storage, {
+              ...baseExportOpts,
+              pattern,
+              workspaceName: ws.name,
+            });
+            totalSuccess += result.success.length;
+            totalFailed += result.failed.length;
+            totalDuration += result.duration;
+            if (result.failed.length) hasError = true;
+          }
+        } else {
+          // 单 workspace 导出（默认行为）
+          if (opts.workspace ?? resolved.workspace) {
+            await client.switchWorkspace(opts.workspace ?? resolved.workspace!);
+            log.info(`已切换到 Workspace: ${opts.workspace ?? resolved.workspace}`);
+          }
+          const result = await exportApps(client, storage, {
+            ...baseExportOpts,
+            pattern: opts.pattern,
+            workspaceName: opts.workspace ?? resolved.workspace,
+          });
+          totalSuccess = result.success.length;
+          totalFailed = result.failed.length;
+          totalDuration = result.duration;
+          hasError = result.failed.length > 0;
+        }
 
         // 输出结果
         if (opts.json) {
           console.log(JSON.stringify({
-            success: true,
-            exported: result.success.length,
-            failed: result.failed.length,
-            total: result.totalApps,
-            duration: result.duration,
-            files: result.success.map((e) => e.filePath),
+            success: !hasError,
+            exported: totalSuccess,
+            failed: totalFailed,
+            duration: totalDuration,
           }));
         } else {
           console.error("");
           log.success(
-            `导出完成：${pc.bold(String(result.success.length))} 个应用，` +
-            `耗时 ${formatDuration(result.duration)}`
+            `导出完成：${pc.bold(String(totalSuccess))} 个应用，` +
+            `耗时 ${formatDuration(totalDuration)}`
           );
-          if (result.failed.length) {
-            log.warn(`${result.failed.length} 个应用导出失败`);
-          }
+          if (totalFailed) log.warn(`${totalFailed} 个应用导出失败`);
         }
 
-        process.exit(result.failed.length > 0 ? 1 : 0);
+        process.exit(hasError ? 1 : 0);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         log.error(msg);
