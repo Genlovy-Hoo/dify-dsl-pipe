@@ -106,13 +106,9 @@ export class LegacyAdapter implements DifyAdapter {
   }
 
   async getWorkspaces(): Promise<DifyWorkspace[]> {
-    try {
-      const res = await this.http.get("/workspaces");
-      const body = res.body as { workspaces?: DifyWorkspace[]; data?: DifyWorkspace[] } | DifyWorkspace[];
-      if (Array.isArray(body)) return body;
-      return body.workspaces ?? body.data ?? [];
-    } catch {
-      return [];
-    }
+    const res = await this.http.get("/workspaces");
+    const body = res.body as { workspaces?: DifyWorkspace[]; data?: DifyWorkspace[] } | DifyWorkspace[];
+    if (Array.isArray(body)) return body;
+    return body.workspaces ?? body.data ?? [];
   }
 }

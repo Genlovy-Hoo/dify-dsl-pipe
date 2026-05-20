@@ -128,14 +128,19 @@ async function exportSingleApp(
           // 将 {name}.yml 或 {name}_{date}.yml 替换为 {name}_versions/{label}_{date}.yml
           // 避免 by-workspace 等含 {date} 的模式产生两个 {date} 占位符
           const resolvedPatternStr = resolvePattern(opts.pattern);
-          const versionPattern = resolvedPatternStr.replace(
+          const withVersions = resolvedPatternStr.replace(
             /\{name\}(?:_\{date\})?\.yml$/,
             `{name}_versions/${versionLabel}_{date}.yml`
           );
-          const verPath = buildFilePath(versionPattern, {
-            ...ctx,
-            date: verDate,
-          });
+          // 若正则未匹配（自定义 pattern 不以 {name}.yml 结尾），
+          // 基于主文件实际路径构造，避免静默覆盖
+          let verPath: string;
+          if (withVersions !== resolvedPatternStr) {
+            verPath = buildFilePath(withVersions, { ...ctx, date: verDate });
+          } else {
+            const mainPath = buildFilePath(opts.pattern, { ...ctx, version: "current" });
+            verPath = mainPath.replace(/\.yml$/, `_versions/${versionLabel}_${verDate ?? "unknown"}.yml`);
+          }
           await storage.write(verPath, verDsl);
           exported.versions.push({ version: ver, dslContent: verDsl, filePath: verPath });
         } catch {

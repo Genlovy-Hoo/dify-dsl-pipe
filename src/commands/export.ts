@@ -93,16 +93,22 @@ export function registerExportCommand(program: Command) {
 
           for (const ws of workspaces) {
             log.info(`\nWorkspace: ${pc.bold(ws.name)}`);
-            await client.switchWorkspace(ws.id);
-            const result = await exportApps(client, storage, {
-              ...baseExportOpts,
-              pattern,
-              workspaceName: ws.name,
-            });
-            totalSuccess += result.success.length;
-            totalFailed += result.failed.length;
-            totalDuration += result.duration;
-            if (result.failed.length) hasError = true;
+            try {
+              await client.switchWorkspace(ws.id);
+              const result = await exportApps(client, storage, {
+                ...baseExportOpts,
+                pattern,
+                workspaceName: ws.name,
+              });
+              totalSuccess += result.success.length;
+              totalFailed += result.failed.length;
+              totalDuration += result.duration;
+              if (result.failed.length) hasError = true;
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : String(e);
+              log.warn(`跳过 Workspace ${ws.name}: ${msg.slice(0, 100)}`);
+              hasError = true;
+            }
           }
         } else {
           // 单 workspace 导出（默认行为）
