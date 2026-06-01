@@ -16,6 +16,7 @@ export interface AdapterConfig {
   email?: string;
   password?: string;
   token?: string;
+  workspaceIdHeader?: string;
   timeout: number;
   maxRetries: number;
   version?: string;

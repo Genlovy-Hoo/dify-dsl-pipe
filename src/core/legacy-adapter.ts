@@ -13,6 +13,9 @@ export class LegacyAdapter implements DifyAdapter {
     this.email = config.email;
     this.password = config.password;
     this.token = config.token;
+    if (config.workspaceIdHeader) {
+      this.http.setHeader("x-workspace-id", config.workspaceIdHeader);
+    }
   }
 
   async login(): Promise<void> {

@@ -12,6 +12,7 @@ export function registerImportCommand(program: Command) {
     .description("导入 DSL 到 Dify 实例")
     .option("--url <url>", "目标 Dify Console API 地址")
     .option("--token <token>", "Access Token")
+    .option("--token-admin <token>", "Admin API Key（与 --workspace 一起使用时会附加 X-WORKSPACE-ID）")
     .option("--email <email>", "登录邮箱")
     .option("--password <password>", "登录密码")
     .option("--profile <name>", "使用配置文件中的 profile")
@@ -37,13 +38,17 @@ export function registerImportCommand(program: Command) {
       try {
         const config = loadConfig(opts.config);
         const resolved = resolveInstanceConfig(config, opts);
+        const resolvedWorkspace = opts.workspace ?? resolved.workspace;
+        const effectiveToken = opts.tokenAdmin ?? resolved.instance.token;
+        const workspaceIdHeader = opts.tokenAdmin && resolvedWorkspace ? resolvedWorkspace : undefined;
 
         // 连接目标 Dify
         const client = new DifyClient({
           baseUrl: resolved.instance.url,
           email: resolved.instance.email,
           password: resolved.instance.password,
-          token: resolved.instance.token,
+          token: effectiveToken,
+          workspaceIdHeader,
           timeout: resolved.instance.timeout,
           maxRetries: resolved.instance.maxRetries,
         });
@@ -51,9 +56,9 @@ export function registerImportCommand(program: Command) {
         const info = await client.connect();
         log.success(`已连接目标 Dify ${info.version} (${info.adapterType} adapter)`);
 
-        if (opts.workspace ?? resolved.workspace) {
-          await client.switchWorkspace(opts.workspace ?? resolved.workspace!);
-          log.info(`已切换到 Workspace: ${opts.workspace ?? resolved.workspace}`);
+        if (resolvedWorkspace) {
+          await client.switchWorkspace(resolvedWorkspace);
+          log.info(`已切换到 Workspace: ${resolvedWorkspace}`);
         }
 
         // 创建源存储

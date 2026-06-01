@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import { DifyClient } from "../core/client.js";
 import { exportApps } from "../core/exporter.js";
+import { HttpClient } from "../core/http.js";
 import { loadConfig, resolveInstanceConfig } from "../config/loader.js";
 import { createStorage } from "../storage/factory.js";
 import type { ExportOptions } from "../config/types.js";
@@ -13,6 +14,7 @@ export function registerExportCommand(program: Command) {
     .description("导出 Dify 应用 DSL")
     .option("--url <url>", "Dify Console API 地址")
     .option("--token <token>", "Access Token")
+    .option("--token-admin <token>", "Admin API Key（与 --workspace 一起使用时会附加 X-WORKSPACE-ID）")
     .option("--email <email>", "登录邮箱")
     .option("--password <password>", "登录密码")
     .option("--profile <name>", "使用配置文件中的 profile")
@@ -45,6 +47,9 @@ export function registerExportCommand(program: Command) {
       try {
         const config = loadConfig(opts.config);
         const resolved = resolveInstanceConfig(config, opts);
+        const resolvedWorkspace = opts.workspace ?? resolved.workspace;
+        const effectiveToken = opts.tokenAdmin ?? resolved.instance.token;
+        const workspaceIdHeader = opts.tokenAdmin && resolvedWorkspace ? resolvedWorkspace : undefined;
 
         // 构建存储配置
         const storageConfig = resolved.storage ?? buildStorageFromFlags(opts);
@@ -54,7 +59,8 @@ export function registerExportCommand(program: Command) {
           baseUrl: resolved.instance.url,
           email: resolved.instance.email,
           password: resolved.instance.password,
-          token: resolved.instance.token,
+          token: effectiveToken,
+          workspaceIdHeader,
           timeout: resolved.instance.timeout,
           maxRetries: resolved.instance.maxRetries,
         });
@@ -88,14 +94,31 @@ export function registerExportCommand(program: Command) {
           // --all-workspaces：遍历所有 workspace 逐一导出
           // 未显式指定 pattern 时从 by-type 升级为 by-workspace，目录自动按 workspace 分组
           const pattern = opts.pattern !== "by-type" ? opts.pattern : "by-workspace";
-          const workspaces = await client.getWorkspaces();
+          const workspaces = opts.tokenAdmin
+            ? await listAllWorkspacesByAdmin(
+                resolved.instance.url,
+                effectiveToken,
+                resolved.instance.timeout
+              )
+            : await client.getWorkspaces();
           log.info(`找到 ${workspaces.length} 个 Workspace`);
 
           for (const ws of workspaces) {
             log.info(`\nWorkspace: ${pc.bold(ws.name)}`);
             try {
-              await client.switchWorkspace(ws.id);
-              const result = await exportApps(client, storage, {
+              const exportClient = opts.tokenAdmin
+                ? await connectScopedAdminClient({
+                    baseUrl: resolved.instance.url,
+                    token: effectiveToken,
+                    workspaceId: ws.id,
+                    timeout: resolved.instance.timeout,
+                    maxRetries: resolved.instance.maxRetries,
+                  })
+                : client;
+              if (!opts.tokenAdmin) {
+                await exportClient.switchWorkspace(ws.id);
+              }
+              const result = await exportApps(exportClient, storage, {
                 ...baseExportOpts,
                 pattern,
                 workspaceName: ws.name,
@@ -112,14 +135,27 @@ export function registerExportCommand(program: Command) {
           }
         } else {
           // 单 workspace 导出（默认行为）
-          if (opts.workspace ?? resolved.workspace) {
-            await client.switchWorkspace(opts.workspace ?? resolved.workspace!);
-            log.info(`已切换到 Workspace: ${opts.workspace ?? resolved.workspace}`);
+          let workspaceNameForPath = resolvedWorkspace;
+          if (resolvedWorkspace) {
+            await client.switchWorkspace(resolvedWorkspace);
+            log.info(`已切换到 Workspace: ${resolvedWorkspace}`);
+            try {
+              const workspaces = await client.getWorkspaces();
+              const matchedWorkspace = workspaces.find((ws) => ws.id === resolvedWorkspace);
+              if (matchedWorkspace?.name) {
+                workspaceNameForPath = matchedWorkspace.name;
+              } else {
+                log.debug(`未找到 Workspace 名称映射，路径中使用原值: ${resolvedWorkspace}`);
+              }
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : String(e);
+              log.debug(`获取 Workspace 列表失败，路径中使用原值: ${msg.slice(0, 120)}`);
+            }
           }
           const result = await exportApps(client, storage, {
             ...baseExportOpts,
             pattern: opts.pattern,
-            workspaceName: opts.workspace ?? resolved.workspace,
+            workspaceName: workspaceNameForPath,
           });
           totalSuccess = result.success.length;
           totalFailed = result.failed.length;
@@ -212,4 +248,55 @@ function parseFilter(expr?: string) {
   }
 
   return Object.keys(filter).length ? filter : undefined;
+}
+
+type AdminWorkspace = { id: string; name: string };
+
+async function listAllWorkspacesByAdmin(
+  baseUrl: string,
+  token: string | undefined,
+  timeout: number
+): Promise<AdminWorkspace[]> {
+  if (!token) throw new Error("缺少 token-admin");
+
+  const http = new HttpClient(baseUrl, timeout, 1);
+  http.setHeader("authorization", `Bearer ${token}`);
+
+  const all: AdminWorkspace[] = [];
+  let page = 1;
+  const limit = 100;
+
+  while (true) {
+    const res = await http.get("/all-workspaces", {
+      page: String(page),
+      limit: String(limit),
+    });
+    const body = res.body as { data?: AdminWorkspace[]; has_more?: boolean };
+    const items = body.data ?? [];
+    all.push(...items);
+    if (!body.has_more || items.length === 0) break;
+    page += 1;
+  }
+
+  return all;
+}
+
+async function connectScopedAdminClient(params: {
+  baseUrl: string;
+  token: string | undefined;
+  workspaceId: string;
+  timeout: number;
+  maxRetries: number;
+}): Promise<DifyClient> {
+  if (!params.token) throw new Error("缺少 token-admin");
+
+  const scoped = new DifyClient({
+    baseUrl: params.baseUrl,
+    token: params.token,
+    workspaceIdHeader: params.workspaceId,
+    timeout: params.timeout,
+    maxRetries: params.maxRetries,
+  });
+  await scoped.connect();
+  return scoped;
 }

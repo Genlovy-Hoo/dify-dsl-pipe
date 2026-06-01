@@ -36,6 +36,9 @@ export class DifyClient {
     if (this.config.token) {
       http.setHeader("authorization", `Bearer ${this.config.token}`);
     }
+    if (this.config.workspaceIdHeader) {
+      http.setHeader("x-workspace-id", this.config.workspaceIdHeader);
+    }
 
     try {
       const res = await http.get("/apps", { page: "1", limit: "1" });
