@@ -70,10 +70,18 @@ export function registerImportCommand(program: Command) {
         }
 
         // 执行导入
+        // local 存储时 source 已作为 basePath，避免再次作为 prefix 导致路径重复拼接
+        const importSource =
+          opts.storage === "local"
+            ? undefined
+            : opts.source !== "./dify-backup"
+              ? opts.source
+              : undefined;
+
         const result = await importApps(client, storage, {
           dryRun: opts.dryRun,
           onConflict: opts.onConflict,
-          source: opts.source !== "./dify-backup" ? opts.source : undefined,
+          source: importSource,
         });
 
         // 输出结果

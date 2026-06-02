@@ -114,7 +114,8 @@ export class ModernAdapter implements DifyAdapter {
 
   async importAppDSL(dslContent: string, opts?: { name?: string; appId?: string }) {
     const payload: Record<string, unknown> = {
-      mode: "YAML_CONTENT",
+      // Dify Console API expects kebab-case import mode values.
+      mode: "yaml-content",
       yaml_content: dslContent,
     };
     if (opts?.name) payload.name = opts.name;
@@ -127,8 +128,8 @@ export class ModernAdapter implements DifyAdapter {
       app_id?: string;
     };
 
-    // 如果状态是 PENDING，需要 confirm
-    if (body.status === "PENDING" && body.id) {
+    // 如果状态是 pending，需要 confirm（兼容大小写）
+    if (String(body.status ?? "").toLowerCase() === "pending" && body.id) {
       const confirmRes = await this.http.post(`/apps/imports/${body.id}/confirm`);
       const confirmBody = confirmRes.body as { app_id?: string; status?: string };
       return {
