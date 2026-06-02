@@ -43,6 +43,10 @@ No installation required — run directly with `npx`:
 # Export all apps to ./dify-backup
 npx dify-dsl-pipe export --url https://your-dify.com/console/api --token YOUR_TOKEN
 
+# Use Admin API Key + workspace (auto-adds X-WORKSPACE-ID)
+npx dify-dsl-pipe export --url https://your-dify.com/console/api \
+  --token-admin YOUR_ADMIN_API_KEY --workspace YOUR_WORKSPACE_ID
+
 # Authenticate with email + password (alternative)
 npx dify-dsl-pipe export --url https://your-dify.com/console/api \
   --email admin@example.com --password your-password
@@ -51,11 +55,16 @@ npx dify-dsl-pipe export --url https://your-dify.com/console/api \
 npx dify-dsl-pipe import --url https://target-dify.com/console/api --token TOKEN \
   --source ./dify-backup --dry-run
 
+# Import with pre-filtering by type/tag/name
+npx dify-dsl-pipe import --url https://target-dify.com/console/api --token TOKEN \
+  --source ./dify-backup --filter "type:workflow,name:support"
+
 # Interactively create a config file
 npx dify-dsl-pipe init
 ```
 
 > `--url` must point to the Console API, ending with `/console/api`.
+> For cross-workspace export/import, use `--workspace` or `--all-workspaces`.
 
 ### Option 2: Agent Skill
 

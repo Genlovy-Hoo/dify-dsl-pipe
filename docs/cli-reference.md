@@ -16,6 +16,7 @@ npx dify-dsl-pipe export [options]
 |------|--------|------|
 | `--url <url>` | — | Dify Console API 地址（必须以 `/console/api` 结尾） |
 | `--token <token>` | — | Access Token（与 email+password 二选一） |
+| `--token-admin <token>` | — | Admin API Key（与 `--workspace` 配合时自动附加 `X-WORKSPACE-ID`） |
 | `--email <email>` | — | 登录邮箱 |
 | `--password <password>` | — | 登录密码 |
 | `--profile <name>` | — | 使用配置文件中的 profile |
@@ -37,6 +38,7 @@ npx dify-dsl-pipe export [options]
 | `--incremental` | `false` | 增量导出，只导出上次之后有变更的应用 |
 | `--archive <format>` | `none` | 打包格式：`none` / `zip` |
 | `--workspace <id>` | — | 指定 Workspace ID |
+| `--all-workspaces` | `false` | 导出所有 Workspace；默认命名模板会从 `by-type` 自动升级为 `by-workspace` |
 | `--json` | `false` | JSON 格式输出，供程序解析 |
 | `--verbose` | `false` | 详细日志 |
 
@@ -81,6 +83,7 @@ npx dify-dsl-pipe import [options]
 |------|--------|------|
 | `--url <url>` | — | 目标 Dify Console API 地址 |
 | `--token <token>` | — | Access Token |
+| `--token-admin <token>` | — | Admin API Key（与 `--workspace` 配合时自动附加 `X-WORKSPACE-ID`） |
 | `--email <email>` | — | 登录邮箱 |
 | `--password <password>` | — | 登录密码 |
 | `--profile <name>` | — | 使用配置文件中的 profile |
@@ -94,6 +97,7 @@ npx dify-dsl-pipe import [options]
 | `--s3-secret-key <key>` | — | S3 Secret Access Key |
 | `--git-repo <path>` | — | Git 仓库路径或 URL |
 | `--git-branch <branch>` | `main` | Git 分支 |
+| `--filter <expr>` | — | 导入前过滤 DSL（支持 `type` / `tag` / `name` 组合） |
 | `--on-conflict <strategy>` | `skip` | 冲突策略：`skip`（跳过）/ `overwrite`（覆盖） |
 | `--dry-run` | `false` | 预览模式，列出将执行的操作，不实际导入 |
 | `--workspace <id>` | — | 指定 Workspace ID |
@@ -101,6 +105,16 @@ npx dify-dsl-pipe import [options]
 | `--verbose` | `false` | 详细日志 |
 
 > **强烈建议**导入前先加 `--dry-run` 预览，确认无误后再去掉执行。
+
+### 导入过滤表达式（--filter）
+
+语法与 export 一致：多条件逗号分隔，同类型 OR，不同类型 AND。
+
+```bash
+--filter "type:advanced-chat"               # 只导入 advanced-chat 类型
+--filter "name:客服"                        # 只导入名称包含“客服”的 DSL
+--filter "type:workflow,tag:核心"           # workflow 类型 AND 核心标签
+```
 
 ---
 
