@@ -84,6 +84,11 @@ export function registerImportCommand(program: Command) {
           source: importSource,
         });
 
+        // 导入完全成功后清理存储临时资源（如 git clone 目录）；失败时保留现场便于排查
+        if (result.failed.length === 0 && storage.finalize) {
+          await storage.finalize();
+        }
+
         // 输出结果
         if (opts.json) {
           console.log(JSON.stringify({

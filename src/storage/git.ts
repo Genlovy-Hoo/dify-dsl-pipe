@@ -32,6 +32,10 @@ export class GitStorage implements StorageBackend {
       // 如果是 URL，先 clone
       if (this.config.repo.includes("://") || this.config.repo.includes("@")) {
         const tmpDir = resolve(process.cwd(), ".dify-pipe-git-tmp");
+        // 每次重新拉取远程仓库，避免上次残留导致 clone 失败
+        if (existsSync(tmpDir)) {
+          rmSync(tmpDir, { recursive: true, force: true });
+        }
         const git = simpleGit();
         await git.clone(this.config.repo, tmpDir, ["--branch", this.config.branch, "--depth", "1"]);
         this.workDir = tmpDir;
