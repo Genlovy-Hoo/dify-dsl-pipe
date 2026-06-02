@@ -26,6 +26,7 @@ export function registerImportCommand(program: Command) {
     .option("--s3-secret-key <key>", "S3 Secret Access Key")
     .option("--git-repo <path>", "Git 仓库路径或 URL")
     .option("--git-branch <branch>", "Git 分支", "main")
+    .option("--filter <expr>", "过滤表达式 (如 type:advanced-chat,name:hello,tag:核心)")
     .option("--on-conflict <strategy>", "冲突策略: skip, overwrite", "skip")
     .option("--dry-run", "预览模式（不实际导入）")
     .option("--workspace <id>", "指定 Workspace ID")
@@ -81,6 +82,7 @@ export function registerImportCommand(program: Command) {
         const result = await importApps(client, storage, {
           dryRun: opts.dryRun,
           onConflict: opts.onConflict,
+          filter: parseFilter(opts.filter),
           source: importSource,
         });
 
@@ -165,4 +167,30 @@ function buildSourceStorage(opts: Record<string, unknown>) {
     type: "local" as const,
     path: (opts.source as string) ?? "./dify-backup",
   };
+}
+
+function parseFilter(expr?: string) {
+  if (!expr) return undefined;
+
+  const filter: { names?: string[]; tags?: string[]; types?: string[] } = {};
+
+  for (const part of expr.split(",")) {
+    const [key, ...valueParts] = part.split(":");
+    const value = valueParts.join(":");
+    if (!value) continue;
+
+    switch (key.trim().toLowerCase()) {
+      case "type":
+        (filter.types ??= []).push(value.trim());
+        break;
+      case "tag":
+        (filter.tags ??= []).push(value.trim());
+        break;
+      case "name":
+        (filter.names ??= []).push(value.trim());
+        break;
+    }
+  }
+
+  return Object.keys(filter).length ? filter : undefined;
 }

@@ -5,6 +5,12 @@ import type { ImportResult, ImportItem, DifyApp } from "./types.js";
 import type { ImportOptions } from "../config/types.js";
 import { log, formatDuration } from "../utils/logger.js";
 
+type ImportDslMeta = {
+  name: string;
+  type?: string;
+  tags: string[];
+};
+
 export async function importApps(
   client: DifyClient,
   storage: StorageBackend,
@@ -45,8 +51,12 @@ export async function importApps(
 
     try {
       const content = await storage.read(file);
-      const name = extractAppName(content) ?? fileToAppName(file);
-      const existing = existingByName.get(name.toLowerCase());
+      const meta = extractDslMeta(content, file);
+      if (opts.filter && !matchFilter(meta, opts.filter)) {
+        continue;
+      }
+
+      const existing = existingByName.get(meta.name.toLowerCase());
 
       let action: "create" | "skip" | "overwrite";
       let reason: string | undefined;
@@ -62,7 +72,7 @@ export async function importApps(
         action = "create";
       }
 
-      items.push({ name, filePath: file, dslContent: content, action, reason });
+      items.push({ name: meta.name, filePath: file, dslContent: content, action, reason });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       failed.push({ name: file, error: msg.slice(0, 200) });
@@ -114,16 +124,63 @@ export async function importApps(
   return { created, skipped, overwritten, failed, duration: Date.now() - start };
 }
 
-function extractAppName(dslContent: string): string | null {
+function extractDslMeta(dslContent: string, filePath: string): ImportDslMeta {
+  const fallbackName = fileToAppName(filePath);
   try {
     const parsed = parseYaml(dslContent);
-    return parsed?.app?.name ?? null;
+    const app = parsed?.app ?? {};
+    const rawTags = app?.tags;
+    let tags: string[] = [];
+    if (Array.isArray(rawTags)) {
+      tags = rawTags
+        .map((t: unknown) => {
+          if (typeof t === "string") return t;
+          if (t && typeof t === "object" && "name" in t) {
+            const n = (t as { name?: unknown }).name;
+            return typeof n === "string" ? n : null;
+          }
+          return null;
+        })
+        .filter((v): v is string => !!v);
+    }
+
+    return {
+      name: typeof app?.name === "string" && app.name ? app.name : fallbackName,
+      type: typeof app?.mode === "string" ? app.mode : undefined,
+      tags,
+    };
   } catch {
-    return null;
+    return { name: fallbackName, tags: [] };
   }
 }
 
 function fileToAppName(filePath: string): string {
   const filename = filePath.split("/").pop() ?? filePath;
   return filename.replace(/\.ya?ml$/, "").replace(/_\d{8}$/, "").replace(/_current$/, "");
+}
+
+function matchFilter(
+  meta: ImportDslMeta,
+  filter: NonNullable<ImportOptions["filter"]>
+): boolean {
+  if (filter.names?.length) {
+    const nameLower = meta.name.toLowerCase();
+    const ok = filter.names.some((n) => nameLower.includes(n.toLowerCase()));
+    if (!ok) return false;
+  }
+
+  if (filter.types?.length) {
+    if (!meta.type) return false;
+    const typeLower = meta.type.toLowerCase();
+    const ok = filter.types.some((t) => t.toLowerCase() === typeLower);
+    if (!ok) return false;
+  }
+
+  if (filter.tags?.length) {
+    const tagSet = new Set(meta.tags.map((t) => t.toLowerCase()));
+    const ok = filter.tags.some((t) => tagSet.has(t.toLowerCase()));
+    if (!ok) return false;
+  }
+
+  return true;
 }

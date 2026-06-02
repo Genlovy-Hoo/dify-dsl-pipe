@@ -68,6 +68,13 @@ export const ExportOptionsSchema = z.object({
 export const ImportOptionsSchema = z.object({
   dryRun: z.boolean().default(false),
   onConflict: z.enum(["skip", "overwrite"]).default("skip"),
+  filter: z
+    .object({
+      names: z.array(z.string()).optional(),
+      tags: z.array(z.string()).optional(),
+      types: z.array(z.string()).optional(),
+    })
+    .optional(),
 });
 
 export const NotificationSchema = z.object({
