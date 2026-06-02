@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, unlinkSync, statSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, unlinkSync, statSync, rmSync } from "node:fs";
 import { resolve, dirname, join, relative } from "node:path";
 import simpleGit, { type SimpleGit } from "simple-git";
 import type { StorageBackend } from "./interface.js";
@@ -19,6 +19,7 @@ export class GitStorage implements StorageBackend {
   private basePath: string;
   private config: GitConfig;
   private dirty = false;
+  private tempWorkDir?: string;
 
   constructor(config: GitConfig) {
     this.config = config;
@@ -35,6 +36,7 @@ export class GitStorage implements StorageBackend {
         await git.clone(this.config.repo, tmpDir, ["--branch", this.config.branch, "--depth", "1"]);
         this.workDir = tmpDir;
         this.basePath = resolve(this.workDir, this.config.path);
+        this.tempWorkDir = tmpDir;
       }
     }
 
@@ -95,7 +97,10 @@ export class GitStorage implements StorageBackend {
   }
 
   async finalize(): Promise<void> {
-    if (!this.dirty) return;
+    if (!this.dirty) {
+      this.cleanupTempWorkDir();
+      return;
+    }
 
     await this.git.add(".");
     const message = this.config.commitMessage.replace(
@@ -107,6 +112,16 @@ export class GitStorage implements StorageBackend {
     if (this.config.push) {
       await this.git.push("origin", this.config.branch);
     }
+
+    this.cleanupTempWorkDir();
+  }
+
+  private cleanupTempWorkDir() {
+    if (!this.tempWorkDir) return;
+    if (existsSync(this.tempWorkDir)) {
+      rmSync(this.tempWorkDir, { recursive: true, force: true });
+    }
+    this.tempWorkDir = undefined;
   }
 }
 
